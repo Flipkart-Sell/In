@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer"> 
+    <title>Flipkart Clone - Shopping & Checkout</title>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Roboto', 'sans-serif'] },
+                    colors: {
+                        fkBlue: '#2874F0',
+                        fkYellow: '#FFE500', 
+                        fkBg: '#F1F3F6',
+                        fkGreen: '#388E3C',
+                        fkText: '#212121',
+                        fkGray: '#878787'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { -webkit-tap-highlight-color: transparent; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .view { display: none; }
+        .view.active { display: block; }
+        
+        /* Floating Label Inputs */
+        .floating-input { position: relative; margin-bottom: 1rem; }
+        .floating-input input {
+            width: 100%; padding: 14px 12px; border: 1px solid #c2c2c2; border-radius: 4px; font-size: 14px; outline: none; transition: border-color 0.2s; background: transparent;
+        }
+        .floating-input input:focus { border-color: #2874F0; }
+        .floating-input label {
+            position: absolute; left: 10px; top: 14px; background: white; padding: 0 4px; color: #878787; font-size: 14px; transition: 0.2s; pointer-events: none;
+        }
+        .floating-input input:focus ~ label, .floating-input input:not(:placeholder-shown) ~ label {
+            top: -8px; font-size: 11px; color: #2874F0;
+        }
+
+        /* Toast */
+        #toast { visibility: hidden; position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); background: #333; color: #fff; padding: 12px 24px; border-radius: 4px; z-index: 2000; transition: opacity 0.3s; opacity: 0; font-size: 14px; white-space: nowrap;}
+        #toast.show { visibility: visible; opacity: 1; }
+
+        /* Wishlist Heart Animation */
+        .wishlist-btn i { transition: transform 0.2s ease, color 0.2s ease; }
+        .wishlist-btn:active i { transform: scale(1.3); }
+
+        /* Similar Products Smooth Scrolling */
+        #pdSimilarProducts { scroll-behavior: smooth; }
+        
+        /* Loading spinner for pincode */
+        .pin-loader { display: none; border: 2px solid #f3f3f3; border-top: 2px solid #2874F0; border-radius: 50%; width: 16px; height: 16px; animation: spin 1s linear infinite; position: absolute; right: 10px; top: 16px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-fkBg text-fkText antialiased flex flex-col min-h-screen">
+
+    <!-- MAIN NAVBAR -->
+    <nav id="mainNav" class="bg-fkBlue sticky top-0 z-50 shadow-md">
+        <div class="max-w-[1248px] mx-auto px-4 h-14 flex items-center justify-between">
+            <div class="flex items-center cursor-pointer" onclick="navigate('home')">
+                <i class="ph ph-list text-white text-2xl mr-3 md:hidden"></i>
+                <div class="flex flex-col leading-[1.1]">
+                    <span class="text-white font-bold text-[19px] italic tracking-wide">Flipkart</span>
+                    <span class="text-white text-[10px] italic hover:underline">
+                        Explore <span class="text-fkYellow font-bold">Plus</span> 
+                        <img src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/plus_aef861.png" class="inline h-[10px] ml-[1px] mb-[1px]" referrerpolicy="no-referrer">
+                    </span>
+                </div>
+            </div>
+
+            <div class="hidden md:flex flex-1 max-w-[550px] mx-6 relative">
+                <input type="text" id="searchInput" placeholder="Search for products, brands and more..." class="w-full py-1.5 px-4 rounded-sm outline-none text-sm text-black shadow-sm">
+                <i class="ph ph-magnifying-glass absolute right-3 top-2 text-fkBlue text-lg"></i>
+            </div>
+
+            <div class="flex items-center space-x-6 text-white text-sm font-medium">
+                <div class="flex items-center relative hover:text-gray-200 cursor-pointer" onclick="navigate('cart')">
+                    <i class="ph ph-shopping-cart text-2xl"></i>
+                    <span id="cartCount" class="absolute -top-1.5 -right-2 bg-red-500 text-white text-[10px] font-bold px-1.5 rounded-full shadow border border-fkBlue">0</span>
+                    <span class="ml-2 hidden md:block">Cart</span>
+                </div>
+            </div>
+        </div>
+        <div class="md:hidden px-2 pb-2 bg-fkBlue">
+            <div class="relative">
+                <input type="text" placeholder="Search for products..." class="w-full py-1.5 px-3 rounded-sm outline-none text-sm text-black shadow-sm">
+            </div>
+        </div>
+    </nav>
+
+    <!-- APP CONTAINER -->
+    <div id="app" class="flex-1 w-full max-w-[1248px] mx-auto pb-4 relative">
+
+        <!-- 1. HOME VIEW -->
+        <div id="home-view" class="view active px-2 sm:px-4 py-4">
+            
+            <!-- Category Header -->
+            <div class="bg-white mb-2 shadow-sm py-3 px-4 overflow-x-auto no-scrollbar flex space-x-6 lg:justify-between items-start text-center rounded">
+                <div class="flex flex-col items-center flex-shrink-0 cursor-pointer hover:text-fkBlue">
+                    <div class="w-14 h-14 mb-1"><img src="https://rukminim2.flixcart.com/flap/80/80/image/29327f40e9c4d26b.png" class="w-full h-full object-contain" referrerpolicy="no-referrer"></div>
+                    <span class="text-[11px] sm:text-xs font-medium">Top Offers</span>
+                </div>
+                <div class="flex flex-col items-center flex-shrink-0 cursor-pointer hover:text-fkBlue">
+                    <div class="w-14 h-14 mb-1"><img src="https://rukminim2.flixcart.com/flap/80/80/image/22fddf3c7da4c4f4.png" class="w-full h-full object-contain" referrerpolicy="no-referrer"></div>
+                    <span class="text-[11px] sm:text-xs font-medium">Mobiles</span>
+                </div>
+                <div class="flex flex-col items-center flex-shrink-0 cursor-pointer hover:text-fkBlue">
+                    <div class="w-14 h-14 mb-1"><img src="https://rukminim2.flixcart.com/flap/80/80/image/69c6589653afdb9a.png" class="w-full h-full object-contain" referrerpolicy="no-referrer"></div>
+                    <span class="text-[11px] sm:text-xs font-medium">Electronics</span>
+                </div>
+                <div class="flex flex-col items-center flex-shrink-0 cursor-pointer hover:text-fkBlue">
+                    <div class="w-14 h-14 mb-1"><img src="https://rukminim2.flixcart.com/flap/80/80/image/0ff199d1bd27eb98.png" class="w-full h-full object-contain" referrerpolicy="no-referrer"></div>
+                    <span class="text-[11px] sm:text-xs font-medium">Appliances</span>
+                </div>
+                <div class="flex flex-col items-center flex-shrink-0 cursor-pointer hover:text-fkBlue">
+                    <div class="w-14 h-14 mb-1"><img src="https://rukminim2.flixcart.com/fk-p-flap/80/80/image/0d75b34f7d8fbcb3.png" class="w-full h-full object-contain" referrerpolicy="no-referrer"></div>
+                    <span class="text-[11px] sm:text-xs font-medium">Fashion</span>
+                </div>
+            </div>
+
+            <!-- Banner -->
+            <div class="w-full bg-gray-100 min-h-[120px] sm:min-h-[200px] mb-2 rounded overflow-hidden relative group shadow-sm">
+                <div id="bannerTrack" class="flex w-full transition-transform duration-500 ease-in-out h-full"></div>
+                <div class="absolute bottom-2 left-0 w-full flex justify-center space-x-2" id="bannerDots"></div>
+            </div>
+            
+            <!-- Trending Offers Bar -->
+            <div class="flex items-center justify-between bg-white p-3 border-b shadow-sm">
+                <h2 class="text-[15px] sm:text-lg font-medium flex items-center">
+                    Trending Offers <span class="text-[10px] ml-2 bg-fkBlue text-white px-1.5 py-0.5 rounded shadow-sm">99% OFF</span>
+                </h2>
+                <div class="flex items-center text-gray-500 text-[11px] sm:text-xs bg-[#f1f3f6] px-2 py-1 rounded">
+                    <i class="ph ph-clock text-base mr-1"></i> Ends in <span id="timer" class="ml-1 font-bold text-red-500">20:00</span>
+                </div>
+            </div>
+
+            <!-- 2x2 PRODUCT GRID -->
+            <!-- Note: grid-cols-2 forces exactly 2 items per row on mobile -->
+            <div class="bg-white p-2 sm:p-4 shadow-sm">
+                <div id="productGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-4 relative pt-1"></div>
+            </div>
+        </div>
+
+        <!-- 2. PRODUCT DETAILS VIEW -->
+        <div id="product-view" class="view px-2 sm:px-4 py-4">
+            <div class="bg-white shadow-sm flex flex-col md:flex-row pb-16 md:pb-0 relative rounded">
+                <button class="wishlist-btn absolute top-4 right-4 md:top-6 md:right-6 p-2 bg-gray-100 rounded-full z-10 shadow border" onclick="toggleWishlistBtn(this)"><i class="ph ph-heart text-gray-400 text-2xl"></i></button>
+
+                <div class="w-full md:w-2/5 p-4 border-r relative cursor-pointer" onclick="openImageViewer()">
+                    <button onclick="event.stopPropagation(); history.back()" class="absolute top-2 left-2 p-2 bg-gray-100 rounded-full md:hidden z-10"><i class="ph ph-arrow-left"></i></button>
+                    <div class="h-80 w-full flex items-center justify-center overflow-hidden p-4 relative">
+                        <img id="pdImage" src="" class="max-h-full max-w-full object-contain" referrerpolicy="no-referrer">
+                        <div class="absolute bottom-2 right-2 bg-white rounded-full p-1.5 shadow border text-gray-500"><i class="ph ph-arrows-out"></i></div>
+                    </div>
+                </div>
+                <div class="w-full md:w-3/5 p-4 relative">
+                    <p class="text-fkGray text-xs mb-1 flex items-center" id="pdCategoryWrapper">
+                        Mobiles & Electronics <span id="pdStockTag" class="ml-3 font-bold px-1.5 py-0.5 rounded text-[10px] uppercase text-white shadow-sm"></span>
+                    </p>
+                    <h1 class="text-lg md:text-xl text-gray-800 mb-2 pr-10" id="pdTitle"></h1>
+                    
+                    <div class="flex items-center space-x-2 mb-3">
+                        <span class="bg-fkGreen text-white text-xs font-bold px-1.5 py-0.5 rounded flex items-center" id="pdRating">4.5 <i class="ph-fill ph-star ml-1 text-[10px]"></i></span>
+                        <span class="text-fkGray text-xs font-medium">22,113 Ratings & 1,420 Reviews</span>
+                    </div>
+                    
+                    <div class="flex items-end space-x-2 mb-4">
+                        <span class="text-fkGreen font-medium mb-0.5" id="pdDiscount"></span>
+                        <span class="text-gray-500 line-through text-sm mb-0.5" id="pdMrp"></span>
+                        <span class="text-3xl font-bold" id="pdPrice"></span>
+                    </div>
+
+                    <!-- WOW Deal Banner on Product Page -->
+                    <div class="mt-4 pb-4 border-b border-gray-200 flex items-center">
+                        <div class="mr-4 flex flex-col items-center leading-none mt-1">
+                            <span class="font-black italic text-[#00108A] text-[28px] tracking-tighter">WOW!</span>
+                            <span class="font-bold italic text-[#00108A] text-[10px] tracking-wide mt-1 bg-white px-1 border border-[#00108A] rounded-sm">DEAL</span>
+                        </div>
+                        <div>
+                            <div class="text-gray-900 text-xl font-medium">Get at <span class="text-[#008C00] font-bold" id="pdWowPrice">₹395</span></div>
+                            <div class="text-[13px] text-gray-800 mt-1">With UPI Payment & More</div>
+                        </div>
+                    </div>
+
+                    <div class="text-sm my-4">
+                        <p class="font-medium mb-2 text-base">Available offers</p>
+                        <p class="flex items-start mb-1 text-gray-700"><i class="ph-fill ph-tag text-fkGreen mt-0.5 mr-2"></i> <span><b>Special Price:</b> Get extra 99% off</span></p>
+                    </div>
+
+                    <!-- Delivery Detail Section -->
+                    <div class="my-4 border-t border-b py-3 flex items-start text-sm">
+                        <i class="ph ph-truck text-fkBlue text-xl mr-3 mt-0.5"></i>
+                        <div>
+                            <p class="text-gray-800" id="pdDeliveryDate"></p>
+                            <p class="text-xs text-gray-500 mt-1">If ordered within next 2 hours</p>
+                        </div>
+                    </div>
+
+                    <div class="mt-4 pt-2">
+                        <div class="flex items-center text-gray-500 mb-3"><h3 class="w-24 text-sm font-medium">Highlights</h3></div>
+                        <ul class="list-disc pl-5 text-sm text-gray-800 space-y-2 marker:text-gray-300" id="pdHighlights"></ul>
+                    </div>
+
+                    <!-- Trust Features -->
+                    <div class="mt-5 bg-[#F8F9FA] rounded-lg p-3 flex items-center space-x-3 border border-gray-100">
+                        <div class="relative flex items-center justify-center"><i class="ph ph-file-text text-3xl text-gray-400"></i><i class="ph-fill ph-check-circle text-[#008C00] absolute -bottom-1 -right-1 text-sm bg-white rounded-full"></i></div>
+                        <span class="text-sm font-medium text-gray-700 uppercase tracking-wide">1-Year Warranty</span>
+                    </div>
+                    <div class="mt-6 flex justify-between px-2 sm:px-4 text-center border-b border-gray-200 pb-6 mb-4">
+                        <div class="flex flex-col items-center"><div class="w-12 h-12 rounded-full bg-[#f0f5ff] flex items-center justify-center mb-2"><i class="ph ph-wrench text-blue-600 text-2xl"></i></div><span class="text-xs text-gray-700 leading-tight">7-day<br>brand support <i class="ph ph-caret-right text-[10px]"></i></span></div>
+                        <div class="flex flex-col items-center"><div class="w-12 h-12 rounded-full bg-[#f0f5ff] flex items-center justify-center mb-2 relative"><i class="ph ph-money text-blue-600 text-2xl"></i><i class="ph-bold ph-x text-blue-600 absolute bottom-1 right-1 bg-[#f0f5ff] rounded-full text-[10px]"></i></div><span class="text-xs text-gray-700 leading-tight">No cash<br>on delivery <i class="ph ph-caret-right text-[10px]"></i></span></div>
+                        <div class="flex flex-col items-center"><div class="w-12 h-12 rounded-full bg-[#f0f5ff] flex items-center justify-center mb-2"><i class="ph-fill ph-shield-check text-blue-600 text-2xl"></i></div><span class="text-xs text-gray-700 leading-tight">Flipkart<br>Assured <i class="ph ph-caret-right text-[10px]"></i></span></div>
+                    </div>
+
+                    <!-- SIMILAR PRODUCTS -->
+                    <div class="mt-8 border-t pt-5">
+                        <h3 class="text-base font-medium text-black mb-3">Similar Products</h3>
+                        <div id="pdSimilarProducts" class="flex overflow-x-auto space-x-3 no-scrollbar pb-2 relative"></div>
+                    </div>
+
+                    <!-- RATINGS & REVIEWS SECTION -->
+                    <div class="mt-6 border-t pt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-lg font-medium text-black">Ratings & Reviews</h3>
+                            <button class="bg-white shadow-sm px-4 py-2 text-sm font-medium text-fkBlue border rounded-sm">Rate Product</button>
+                        </div>
+                        
+                        <!-- Progress Bars UI -->
+                        <div class="flex items-center space-x-6 mb-6">
+                            <div class="text-center">
+                                <div class="text-4xl font-light flex items-center justify-center text-black" id="pdOverallRating2">4.5 <i class="ph-fill ph-star text-2xl ml-1 text-fkGreen"></i></div>
+                                <div class="text-[11px] text-gray-500 mt-1 font-medium">22,113 Ratings &<br>1,420 Reviews</div>
+                            </div>
+                            
+                            <div class="flex-1 space-y-1.5 text-xs text-gray-600 font-medium">
+                                <div class="flex items-center"><span>5 <i class="ph-fill ph-star text-[8px]"></i></span><div class="w-full h-1.5 bg-gray-200 mx-2 rounded-full overflow-hidden"><div class="bg-fkGreen h-full w-[70%]"></div></div><span class="w-8 text-right">15,000</span></div>
+                                <div class="flex items-center"><span>4 <i class="ph-fill ph-star text-[8px]"></i></span><div class="w-full h-1.5 bg-gray-200 mx-2 rounded-full overflow-hidden"><div class="bg-fkGreen h-full w-[20%]"></div></div><span class="w-8 text-right">4,000</span></div>
+                                <div class="flex items-center"><span>3 <i class="ph-fill ph-star text-[8px]"></i></span><div class="w-full h-1.5 bg-gray-200 mx-2 rounded-full overflow-hidden"><div class="bg-fkGreen h-full w-[5%]"></div></div><span class="w-8 text-right">1,000</span></div>
+                                <div class="flex items-center"><span>2 <i class="ph-fill ph-star text-[8px]"></i></span><div class="w-full h-1.5 bg-gray-200 mx-2 rounded-full overflow-hidden"><div class="bg-[#ff9f00] h-full w-[2%]"></div></div><span class="w-8 text-right">500</span></div>
+                                <div class="flex items-center"><span>1 <i class="ph-fill ph-star text-[8px]"></i></span><div class="w-full h-1.5 bg-gray-200 mx-2 rounded-full overflow-hidden"><div class="bg-red-500 h-full w-[3%]"></div></div><span class="w-8 text-right">1,613</span></div>
+                            </div>
+                        </div>
+
+                        <!-- Fake Comments List -->
+                        <div class="space-y-4 border-t pt-4">
+                            <div class="border-b pb-4">
+                                <div class="flex items-center space-x-2 mb-2"><span class="bg-fkGreen text-white text-[10px] px-1.5 py-0.5 rounded flex items-center font-bold">5 <i class="ph-fill ph-star ml-0.5 text-[8px]"></i></span><span class="font-medium text-sm text-gray-800">Simply awesome</span></div>
+                                <p class="text-sm text-gray-800 mb-3 font-light">Excellent quality product. I am very happy with this purchase. The performance is top notch!</p>
+                                <div class="flex items-center justify-between text-xs text-gray-500"><div class="flex items-center space-x-2"><span class="font-medium text-gray-700">Ravi Kumar</span> <i class="ph-fill ph-check-circle text-gray-400"></i> <span>Certified Buyer, 2 months ago</span></div><div class="flex items-center space-x-4"><span class="flex items-center cursor-pointer hover:text-fkBlue"><i class="ph-fill ph-thumbs-up mr-1"></i> 245</span><span class="flex items-center cursor-pointer hover:text-fkBlue"><i class="ph-fill ph-thumbs-down mr-1"></i> 12</span></div></div>
+                            </div>
+                            
+                            <div class="border-b pb-4">
+                                <div class="flex items-center space-x-2 mb-2"><span class="bg-fkGreen text-white text-[10px] px-1.5 py-0.5 rounded flex items-center font-bold">4 <i class="ph-fill ph-star ml-0.5 text-[8px]"></i></span><span class="font-medium text-sm text-gray-800">Value-for-money</span></div>
+                                <p class="text-sm text-gray-800 mb-3 font-light">Good product at this price point. Camera quality could be a bit better but overall performance is smooth.</p>
+                                <div class="flex items-center justify-between text-xs text-gray-500"><div class="flex items-center space-x-2"><span class="font-medium text-gray-700">Priya Sharma</span> <i class="ph-fill ph-check-circle text-gray-400"></i> <span>Certified Buyer, 1 month ago</span></div><div class="flex items-center space-x-4"><span class="flex items-center"><i class="ph-fill ph-thumbs-up mr-1"></i> 120</span><span class="flex items-center"><i class="ph-fill ph-thumbs-down mr-1"></i> 5</span></div></div>
+                            </div>
+                            <button class="w-full py-2.5 text-fkBlue font-medium text-sm shadow border rounded-sm mt-2">All 1420 reviews</button>
+                        </div>
+                    </div>
+                    
+                    <div class="hidden md:flex space-x-4 mt-8" id="pdDesktopActions">
+                        <!-- Replaced via JS -->
+                    </div>
+                </div>
+            </div>
+            <div class="md:hidden fixed bottom-0 left-0 w-full bg-white flex border-t shadow-[0_-2px_10px_rgba(0,0,0,0.1)] z-40" id="pdMobileActions">
+                <!-- Replaced via JS -->
+            </div>
+        </div>
+
+        <!-- 3. CART VIEW -->
+        <div id="cart-view" class="view px-2 sm:px-4 py-4">
+            <h2 class="text-lg font-medium bg-white p-3 border-b shadow-sm flex items-center"><i class="ph ph-arrow-left mr-3 cursor-pointer" onclick="history.back()"></i> My Cart</h2>
+            <div id="cartItemsContainer" class="bg-white"></div>
+            
+            <div id="cartPriceDetails" class="bg-white mt-2 p-4 shadow-sm hidden mb-20 md:mb-0">
+                <h3 class="text-gray-500 font-medium border-b pb-2 mb-3 text-sm">PRICE DETAILS</h3>
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between"><span>Price (<span id="cartSumItems">0</span> items)</span><span id="cartMrpTotal">₹0</span></div>
+                    <div class="flex justify-between"><span>Discount</span><span class="text-fkGreen" id="cartDiscount">- ₹0</span></div>
+                    <div class="flex justify-between border-t border-dashed pt-3 font-bold text-base"><span>Total Amount</span><span id="cartTotal">₹0</span></div>
+                </div>
+            </div>
+            
+            <div id="cartBottomBar" class="fixed bottom-0 left-0 w-full bg-white border-t p-2 px-4 shadow-[0_-2px_10px_rgba(0,0,0,0.1)] z-40 hidden flex items-center justify-between md:relative md:shadow-none md:border-none md:mt-4 md:bg-transparent">
+                <div class="md:hidden">
+                    <span class="text-lg font-bold block" id="cartBottomTotal">₹0</span>
+                    <span class="text-fkBlue text-xs font-medium cursor-pointer">View price details</span>
+                </div>
+                <button onclick="startCheckout()" class="bg-[#fb641b] text-white px-8 py-2.5 font-medium rounded shadow md:w-full md:py-3 text-sm">Place Order</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- GLOBAL FOOTER (EXTRA PADDING REMOVED) -->
+    <div id="global-footer" class="w-full bg-white border-t border-gray-200 mt-auto hidden">
+        <footer class="pt-8 pb-4 text-xs md:text-sm bg-white">
+            <div class="max-w-6xl mx-auto px-6 flex flex-col items-center">
+                <div class="flex flex-wrap justify-center gap-6 md:gap-10 text-blue-500 font-medium text-[15px] md:text-lg mb-8">
+                    <a href="#" class="hover:text-blue-700 transition">Become a Seller</a>
+                    <a href="#" class="hover:text-blue-700 transition">Advertise</a>
+                    <a href="#" class="hover:text-blue-700 transition">Gift Cards</a>
+                    <a href="#" class="hover:text-blue-700 transition">Help Center</a>
+                </div>
+                <div class="text-gray-600 text-[15px] md:text-lg mb-8 flex items-center justify-center text-center font-normal">
+                    © 2007-2025 <span class="font-bold text-blue-500 mx-1">Flipkart.com</span> — All Rights Reserved
+                </div>
+                <div class="flex justify-center w-full mt-2">
+                    <img src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/payment-method_69e7ec.svg" alt="Payment Methods" class="h-8 md:h-10 object-contain">
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- FULL SCREEN IMAGE VIEWER -->
+    <div id="image-viewer" class="hidden fixed inset-0 bg-white z-[2000] flex items-center justify-center transition-opacity">
+        <button onclick="closeImageViewer()" class="absolute top-4 right-4 text-gray-600 p-2 text-3xl hover:text-black bg-gray-100 rounded-full shadow-sm"><i class="ph ph-x"></i></button>
+        <div class="w-full h-full p-4 flex items-center justify-center">
+            <img id="viewer-img" src="" class="max-w-full max-h-full object-contain" referrerpolicy="no-referrer">
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- CHECKOUT FLOW -->
+    <!-- ========================================== -->
+    <div id="checkout-flow-view" class="view hidden fixed inset-0 bg-gray-100 z-[100] overflow-y-auto pb-20">
+        
+        <div class="bg-fkBlue text-white flex items-center px-4 py-3 sticky top-0 z-50">
+            <i class="ph ph-arrow-left text-xl cursor-pointer" onclick="backCheckoutStep()"></i>
+            <span class="ml-4 font-medium text-lg" id="checkoutTitle">Add delivery address</span>
+        </div>
+
+        <div class="bg-white flex items-center justify-center py-3 border-b sticky top-[52px] z-40 shadow-sm">
+            <div class="flex items-center w-full max-w-sm px-6 justify-between">
+                <div class="flex flex-col items-center relative z-10"><div id="step1Icon" class="w-6 h-6 rounded-full bg-fkBlue text-white flex items-center justify-center text-xs font-bold">1</div><span id="step1Text" class="text-[10px] mt-1 font-medium text-fkBlue">Address</span></div>
+                <div class="flex-1 h-[2px] bg-gray-200 mx-[-10px] mt-[-15px] z-0" id="line1"></div>
+                <div class="flex flex-col items-center relative z-10"><div id="step2Icon" class="w-6 h-6 rounded-full border-2 border-gray-300 text-gray-400 bg-white flex items-center justify-center text-xs font-bold">2</div><span id="step2Text" class="text-[10px] mt-1 text-gray-400">Order Summary</span></div>
+                <div class="flex-1 h-[2px] bg-gray-200 mx-[-10px] mt-[-15px] z-0" id="line2"></div>
+                <div class="flex flex-col items-center relative z-10"><div id="step3Icon" class="w-6 h-6 rounded-full border-2 border-gray-300 text-gray-400 bg-white flex items-center justify-center text-xs font-bold">3</div><span id="step3Text" class="text-[10px] mt-1 text-gray-400">Payment</span></div>
+            </div>
+        </div>
+
+        <div class="max-w-md mx-auto">
+            
+            <!-- STEP 1 -->
+            <div id="checkout-step-1" class="bg-white p-4 mt-2 shadow-sm">
+                <div class="floating-input mt-2"><input type="text" id="addName" placeholder=" " value=""><label>Full Name (Required) *</label></div>
+                <div class="floating-input"><input type="tel" id="addPhone" placeholder=" " value=""><label>Phone number (Required) *</label></div>
+                
+                <div class="flex space-x-2 mb-4">
+                    <div class="floating-input w-1/2 mb-0 relative">
+                        <input type="number" id="addPin" placeholder=" " value="" oninput="fetchPincodeDetails(this.value)">
+                        <label>Pincode (Required) *</label>
+                        <div id="pinLoader" class="pin-loader"></div>
+                    </div>
+                    <button class="w-1/2 bg-fkBlue text-white text-sm font-medium rounded flex items-center justify-center"><i class="ph p-1 ph-crosshair mr-1 text-lg"></i> Use my location</button>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <div class="floating-input w-1/2"><input type="text" id="addState" placeholder=" " value=""><label>State (Required) *</label></div>
+                    <div class="floating-input w-1/2"><input type="text" id="addCity" placeholder=" " value=""><label>City (Required) *</label></div>
+                </div>
+                <div class="floating-input"><input type="text" id="addHouse" placeholder=" " value=""><label>House No., Building Name</label></div>
+                <div class="floating-input"><input type="text" id="addRoad" placeholder=" " value=""><label>Road name, Area, Colony</label></div>
+                
+                <div class="fixed bottom-0 left-0 w-full bg-white border-t p-3 z-50 flex justify-center"><button onclick="goToStep(2, true)" class="w-full max-w-md bg-[#fb641b] text-white py-3 rounded shadow font-medium">Save Address</button></div>
+            </div>
+
+            <!-- STEP 2 -->
+            <div id="checkout-step-2" class="hidden pb-24">
+                <div class="bg-white p-4 shadow-sm mb-2">
+                    <div class="flex justify-between items-start"><h3 class="text-sm font-medium">Deliver to:</h3><button class="border border-gray-300 text-fkBlue text-xs px-3 py-1 rounded font-medium">Change</button></div>
+                    <div class="mt-2"><span class="font-bold text-sm" id="chkName">User</span> <span class="bg-gray-200 text-[10px] px-1.5 py-0.5 rounded ml-2 text-gray-600 font-medium">HOME</span><p class="text-sm mt-1 text-gray-800" id="chkFullAdd">Address not provided</p><p class="text-sm font-medium mt-1" id="chkPhone"></p></div>
+                </div>
+
+                <div id="chkItemsContainer" class="bg-white shadow-sm mb-2"></div>
+
+                <div class="bg-white p-4 shadow-sm">
+                    <div class="space-y-3 text-sm">
+                        <div class="flex justify-between text-gray-600"><span>MRP</span><span id="chkMrpTotal">₹0</span></div>
+                        <div class="flex justify-between text-gray-600"><span>Fees</span><span>₹7</span></div>
+                        <div class="flex justify-between text-gray-600"><span>Discounts</span><span class="text-fkGreen" id="chkDiscount">- ₹0</span></div>
+                        <div class="flex justify-between border-t border-dashed pt-3 font-bold text-base mt-2"><span>Total Amount</span><span id="chkTotalAmount">₹0</span></div>
+                    </div>
+                </div>
+                
+                <div class="fixed bottom-0 left-0 w-full bg-white border-t p-3 z-50 flex justify-between items-center shadow-[0_-5px_10px_rgba(0,0,0,0.05)]">
+                    <div class="ml-2"><span class="text-xs text-gray-500 line-through block" id="chkBottomMrp">0</span><div class="flex items-center"><span class="text-lg font-bold mr-1" id="chkBottomPrice">0</span></div></div>
+                    <button onclick="goToStep(3, true)" class="bg-[#fb641b] text-white px-10 py-3 rounded text-sm font-medium w-[200px]">Continue</button>
+                </div>
+            </div>
+
+            <!-- STEP 3: PAYMENT -->
+            <div id="checkout-step-3" class="hidden pb-24">
+                <div class="flex justify-end px-4 py-2 text-xs font-bold text-gray-600"><span class="bg-gray-200 px-2 py-1 rounded flex items-center"><i class="ph-fill ph-shield-check text-green-600 mr-1 text-lg"></i> 100% Secure Payments</span></div>
+                <div class="bg-[#f0f5ff] m-3 rounded flex justify-between items-center p-4 shadow-sm border border-blue-50"><span class="text-fkBlue font-medium flex items-center text-sm">Amount Payable</span><span class="font-bold text-fkBlue text-xl" id="payTotalAmount">₹0</span></div>
+                <div class="bg-blue-50 border border-blue-100 mx-3 p-3 mb-4 flex items-center rounded shadow-sm"><i class="ph-fill ph-shield-check text-blue-600 text-3xl mr-3"></i><div class="text-[11px] text-gray-700 leading-tight"><span class="font-bold text-gray-900 text-xs">Safe & Secure Payments</span><br>Trusted by 50+ Million Happy Customers globally.</div></div>
+                <h3 class="px-4 text-sm font-bold text-gray-500 mb-2 uppercase mt-4">UPI Payments</h3>
+                <div class="bg-white shadow-sm border-t border-b text-sm mb-4">
+                    <label class="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="selectPaymentMethod('phonepe')"><div class="flex items-center"><div class="w-8 h-8 rounded bg-purple-100 flex items-center justify-center mr-3 text-purple-700 text-xl font-bold border border-purple-200">पे</div><span class="font-bold text-black">PhonePe</span></div><input type="radio" id="pay-phonepe" name="paymentMethod" class="w-4 h-4 accent-fkBlue"></label>
+                    <label class="p-4 border-b flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="selectPaymentMethod('paytm')"><div class="flex items-center"><div class="w-8 h-8 rounded bg-blue-100 flex items-center justify-center mr-3 text-[#00b9f1] text-lg font-bold border border-blue-200"><i class="ph-fill ph-wallet"></i></div><span class="font-bold text-black">Paytm</span></div><input type="radio" id="pay-paytm" name="paymentMethod" class="w-4 h-4 accent-fkBlue"></label>
+                    <label class="p-4 flex items-center justify-between cursor-pointer hover:bg-gray-50 transition-colors" onclick="selectPaymentMethod('qr')"><div class="flex items-center"><div class="w-8 h-8 rounded bg-gray-100 flex items-center justify-center mr-3 text-gray-700 text-xl border border-gray-200"><i class="ph-fill ph-qr-code"></i></div><div class="flex flex-col"><span class="font-bold text-black">Scan QR Code</span><span class="text-xs text-gray-500">Scan with any UPI app</span></div></div><input type="radio" id="pay-qr" name="paymentMethod" class="w-4 h-4 accent-fkBlue"></label>
+                </div>
+                <div class="fixed bottom-0 left-0 w-full bg-white border-t p-3 z-50 flex justify-between items-center shadow-[0_-5px_10px_rgba(0,0,0,0.05)]">
+                    <div class="ml-2 font-bold text-xl" id="payBottomTotal">₹0</div>
+                    <button onclick="processPayment()" id="placeOrderBtn" class="bg-gray-300 text-gray-500 px-10 py-3 rounded text-sm font-medium w-[200px] pointer-events-none transition-colors">Pay Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- QR Code Scan Modal -->
+    <div id="qr-modal" class="hidden fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-4 backdrop-blur-sm transition-opacity">
+        <div class="bg-white rounded-lg p-6 w-full max-w-sm text-center shadow-2xl relative">
+            <button onclick="closeQrModal()" class="absolute top-3 right-3 text-gray-400 hover:text-black text-2xl"><i class="ph ph-x"></i></button>
+            <h3 class="text-lg font-bold text-gray-800 mb-1">Scan to Pay</h3>
+            <p class="text-sm text-gray-500 mb-3">Open any UPI app (GPay, PhonePe, Paytm) to scan and pay <span id="qrAmountDisplay" class="font-bold text-black">₹0</span></p>
+            <div class="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-gray-300 flex flex-col justify-center items-center mb-4 relative group">
+                <img id="dynamicQRCode" src="" class="w-44 h-44 object-contain rounded border shadow-sm bg-white p-2">
+                
+                <!-- NEW: Download Button inside the box -->
+                <button onclick="downloadQR()" class="mt-3 bg-[#e8efff] text-fkBlue border border-[#d2dfff] text-xs font-bold py-1.5 px-4 rounded shadow-sm hover:bg-[#d6e3ff] flex items-center transition">
+                    <i class="ph ph-download-simple mr-2 text-base font-bold"></i> Download QR
+                </button>
+            </div>
+            
+            <div class="flex items-center justify-center text-green-600 text-sm font-medium animate-pulse mb-3"><i class="ph-fill ph-spinner-gap animate-spin mr-2 text-lg"></i> Waiting for payment...</div>
+            <button onclick="simulatePaymentSuccess()" class="w-full bg-[#f0f5ff] text-fkBlue border border-blue-200 py-2.5 rounded text-sm font-bold flex items-center justify-center hover:bg-blue-100 transition shadow-sm"><img src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/flipkart-plus_8d85f4.png" class="h-4 mr-2" alt="Flipkart"> Flipkart Retailer</button>
+        </div>
+    </div>
+
+    <!-- Order Success View -->
+    <div id="success-view" class="view fixed inset-0 bg-white z-[200]">
+        <div class="h-full flex flex-col items-center justify-center text-center p-4">
+            <div class="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6 shadow-inner"><i class="ph-fill ph-check-circle text-6xl text-fkGreen"></i></div>
+            <h1 class="text-2xl font-bold mb-2 text-gray-800">Order Placed Successfully!</h1>
+            <p class="text-gray-500 mb-8 font-medium">Payment received via UPI.</p>
+            <button onclick="window.location.reload()" class="bg-fkBlue text-white px-10 py-3 rounded shadow font-medium hover:bg-blue-600 transition">Continue Shopping</button>
+        </div>
+    </div>
+
+    <div id="toast">Message here</div>
+
+    <!-- ========================================== -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ========================================== -->
+    <script>
+        function getDeliveryDate() { const d = new Date(); d.setDate(d.getDate() + 2); return d.toLocaleDateString('en-IN', { weekday: 'short', month: 'short', day: 'numeric' }); }
+
+        const BANNERS = ["https://i.ibb.co/G3NGVf2F/3d6b9bffb01c5821.png", "https://i.ibb.co/fY1mzxS0/cdeda7c1a9861aaa.png", "https://i.ibb.co/60FXyNx4/a5742d60cc353c5d.png", "https://i.ibb.co/0kBctyt/beb433a30d69e700.png"];
+
+        // FULL 28 PRODUCTS - REORDERED
+        const PRODUCTS = [
+            // Moved to top as requested
+            { id: 17, name: "Apple iPhone 17 Pro (Titanium Black, 256 GB)", sub: "Titanium Black", image: "https://i.ibb.co/5W6Vs14P/original-imahft5nm9eewyzh.jpg", price: 1499, mrp: 149900, rating: 4.9, inStock: true, highlights: ["256 GB ROM", "15.49 cm (6.1 inch) Super Retina XDR OLED", "48MP + 48MP + 12MP | 12MP Front", "A18 Pro Chip"] },
+            { id: 18, name: "Apple iPhone 17 (Midnight, 128 GB)", sub: "Midnight", image: "https://i.ibb.co/67YLWWjH/original-imahft5g9uthykuh.jpg", price: 899, mrp: 89900, rating: 4.8, inStock: true, highlights: ["128 GB ROM", "48MP + 12MP | 12MP Front Camera", "A18 Bionic Chip"] },
+            { id: 19, name: "Samsung Galaxy S26 Ultra 5G (Phantom Black, 512 GB)", sub: "Phantom Black", image: "https://i.ibb.co/jkpNnGLm/original-imahhyzrnhgzvdk4.jpg", price: 1399, mrp: 139999, rating: 4.9, inStock: true, highlights: ["512 GB ROM", "200MP + 50MP + 50MP + 12MP", "Snapdragon 8 Gen 4 Processor"] },
+            { id: 20, name: "Samsung Galaxy S26 5G (Cream, 256 GB)", sub: "Cream", image: "https://i.ibb.co/WWgg6RvS/original-imahhyzhvrav62ff.jpg", price: 849, mrp: 84999, rating: 4.7, inStock: true, highlights: ["256 GB ROM", "50MP + 12MP + 10MP | 12MP Front", "Snapdragon 8 Gen 4 Processor"] },
+            
+            // Rest of products
+            { id: 1, name: "Apple iPhone 14 (Blue, 128 GB)", sub: "Blue", image: "https://i.ibb.co/fdQGWTNQ/original-imaghx9qkugtbfrn.jpg", price: 699, mrp: 69900, rating: 4.6, inStock: true, highlights: ["128 GB ROM", "15.49 cm (6.1 inch) Super Retina XDR Display", "12MP + 12MP | 12MP Front Camera"] },
+            { id: 2, name: "Apple iPhone 14 Pro (Deep Purple)", sub: "Deep Purple", image: "https://i.ibb.co/Xx9BgBB6/original-imaghxemmqyahnuj.jpg", price: 1299, mrp: 129900, rating: 4.7, inStock: true, highlights: ["128 GB ROM", "15.49 cm (6.1 inch) Super Retina XDR Display", "48MP + 12MP + 12MP | 12MP Front Camera"] },
+            { id: 3, name: "Apple iPhone 15 (Blue, 128 GB)", sub: "Blue", image: "https://i.ibb.co/d0rrtBmS/original-imagtc5fz9spysyk.jpg", price: 799, mrp: 79900, rating: 4.6, inStock: true, highlights: ["128 GB ROM", "48MP + 12MP | 12MP Front Camera", "A16 Bionic Chip"] },
+            { id: 4, name: "Apple iPhone 15 Pro (Natural Titanium)", sub: "Natural Titanium", image: "https://i.ibb.co/zWDnYQwt/original-imagtc4hzawdcp4g.jpg", price: 1349, mrp: 134900, rating: 4.7, inStock: true, highlights: ["128 GB ROM", "48MP + 12MP + 12MP | 12MP Front", "A17 Pro Chip"] },
+            { id: 5, name: "Samsung Galaxy S24 Ultra 5G", sub: "Titanium Gray", image: "https://i.ibb.co/rfGgCJQq/original-imahgfmxumntk7sy.jpg", price: 1299, mrp: 129999, rating: 4.8, inStock: true, highlights: ["256 GB ROM", "200MP + 50MP + 12MP + 10MP", "Snapdragon 8 Gen 3 Processor"] },
+            { id: 6, name: "Apple MacBook Air M2", sub: "Space Grey", image: "https://i.ibb.co/jkDZgyjX/original-imagfdfew8gszzhk.jpg", price: 999, mrp: 99900, rating: 4.7, inStock: true, highlights: ["Apple M2 Processor", "8 GB Unified Memory", "256 GB SSD"] },
+            { id: 7, name: "SONY WH-1000XM4 ANC Headset", sub: "Black", image: "https://i.ibb.co/JR9HDj0S/wh-1000xm4-sony-original-imagcywfdjbadxcf.jpg", price: 269, mrp: 26990, rating: 4.6, inStock: true, highlights: ["Bluetooth version: 5.0", "Battery life: 30 hrs", "Noise Cancellation"] },
+            { id: 8, name: "Apple Watch Series 9 GPS 45mm", sub: "Midnight", image: "https://i.ibb.co/9kGHhBKg/45-mr993hn-a-ios-apple-yes-original-imagterzzu4fsrqg.jpg", price: 449, mrp: 44900, rating: 4.6, inStock: true, highlights: ["Always-On Retina LTPO OLED", "Blood oxygen sensor", "Water resistant 50m"] },
+            { id: 9, name: "Poco X6 Pro 5G (Racing Grey, 256 GB)", sub: "Grey, 8GB RAM", image: "https://i.ibb.co/TMKGw2HQ/original-imah4mdfkwbz79gn.jpg", price: 269, mrp: 26999, rating: 4.5, inStock: true, highlights: ["8 GB RAM | 256 GB ROM", "16.94 cm (6.67 inch) Display", "64MP + 8MP + 2MP | 16MP Front", "Dimensity 8300 Ultra Processor"] },
+            { id: 10, name: "Motorola Edge 50 Pro 5G", sub: "Black Beauty, 256 GB", image: "https://i.ibb.co/7JSphDzR/original-imagzhspjy5g8nh3.jpg", price: 319, mrp: 35999, rating: 4.4, inStock: true, highlights: ["12 GB RAM | 256 GB ROM", "17.02 cm (6.7 inch) pOLED Display", "50MP + 13MP + 10MP | 50MP Front", "Snapdragon 7 Gen 3 Processor"] },
+            { id: 11, name: "Vivo T2 Pro 5G", sub: "New Moon Black, 256 GB", image: "https://i.ibb.co/1tL67sWJ/original-imagtt4h4ptmxgwn.jpg", price: 239, mrp: 24999, rating: 4.6, inStock: true, highlights: ["8 GB RAM | 256 GB ROM", "17.22 cm (6.78 inch) Full HD+ Display", "64MP + 2MP | 16MP Front", "Dimensity 7200 Processor"] },
+            { id: 12, name: "OnePlus 12R (Cool Blue, 256 GB)", sub: "Blue, 16GB RAM", image: "https://i.ibb.co/Gv5wjpsN/12r-cph2585-oneplus-original-imah9zk5nnfqyurm.jpg", price: 459, mrp: 45999, rating: 4.7, inStock: true, highlights: ["16 GB RAM | 256 GB ROM", "17.22 cm (6.78 inch) Display", "50MP Rear Camera", "Snapdragon 8 Gen 2 Processor"] },
+            { id: 13, name: "Nothing Phone (2a) 5G", sub: "White, 128 GB", image: "https://i.ibb.co/G4CFxWs7/original-imagz7f9hzrahd2z.jpg", price: 259, mrp: 25999, rating: 4.4, inStock: true, highlights: ["8 GB RAM | 128 GB ROM", "17.02 cm (6.7 inch) AMOLED Display", "50MP + 50MP | 32MP Front Camera", "Dimensity 7200 Pro Processor"] },
+            { id: 14, name: "Samsung Galaxy Tab S9 FE", sub: "Mint, 128 GB", image: "https://i.ibb.co/Lh5t3kNk/original-imahjsydg2g3zafv.jpg", price: 369, mrp: 44999, rating: 4.5, inStock: true, highlights: ["6 GB RAM | 128 GB ROM", "27.69 cm (10.9 inch) WUXGA+ Display", "8MP Primary Camera | 12MP Front", "Exynos 1380 Processor"] },
+            { id: 15, name: "ASUS TUF Gaming F15", sub: "Black, Intel Core i5", image: "https://i.ibb.co/MDVT3B0f/original-imagetjfvgfsm24g.jpg", price: 659, mrp: 89990, rating: 4.6, inStock: true, highlights: ["Intel Core i5 11th Gen Processor", "16 GB DDR4 RAM", "512 GB SSD", "NVIDIA RTX 3050 Graphics", "15.6 inch 144Hz Display"] },
+            { id: 16, name: "realme Buds Air 5 Pro", sub: "Astral Black", image: "https://i.ibb.co/sJDMWSry/original-imagsgfbgrfhy7vm.jpg", price: 49, mrp: 4999, rating: 4.3, inStock: true, highlights: ["With Mic: Yes", "Bluetooth version: 5.3", "50dB Active Noise Cancellation", "Up to 40 Hours Playback", "Dual Driver Technology"] },
+            { id: 21, name: "Apple MacBook Pro M4 Max (32GB/1TB SSD)", sub: "Space Black", image: "https://i.ibb.co/6cDXLxwz/original-imah697na9bjbnsx.jpg", price: 3199, mrp: 319900, rating: 4.9, inStock: true, highlights: ["Apple M4 Max Processor", "32 GB Unified Memory", "1 TB SSD", "16.2 inch Liquid Retina XDR Display"] },
+            
+            // SPECIFIC ITEM OUT OF STOCK
+            { id: 22, name: "Apple MacBook Air M3 (16GB/512GB SSD)", sub: "Starlight", image: "https://i.ibb.co/Vp26ySmC/original-imagypv6datec8tp.jpg", price: 1499, mrp: 149900, rating: 4.8, inStock: false, highlights: ["Apple M3 Processor", "16 GB Unified Memory", "512 GB SSD", "15.3 inch Liquid Retina Display"] },
+            
+            { id: 23, name: "Vivo X300 Pro 5G (Asteroid Black, 512 GB)", sub: "Asteroid Black, 12GB RAM", image: "https://i.ibb.co/4wXkg4Zx/original-imahg954jjjetdkp.jpg", price: 899, mrp: 89999, rating: 4.7, inStock: true, highlights: ["12 GB RAM | 512 GB ROM", "17.22 cm (6.78 inch) AMOLED 144Hz", "50MP + 50MP + 64MP | 32MP Front", "Dimensity 9300 Processor"] },
+            { id: 24, name: "Vivo V70 Pro 5G (Magic Blue, 256 GB)", sub: "Magic Blue, 8GB RAM", image: "https://i.ibb.co/1GvMzQZV/original-imahktczgdwxmxzj.jpg", price: 459, mrp: 45999, rating: 4.5, inStock: true, highlights: ["8 GB RAM | 256 GB ROM", "17.22 cm (6.78 inch) Display", "50MP + 8MP + 2MP | 50MP Front", "Snapdragon 7 Gen 3 Processor"] },
+            { id: 25, name: "OnePlus 15 5G (Emerald Green, 256 GB)", sub: "Emerald Green, 12GB RAM", image: "https://i.ibb.co/9mv6rYV1/original-imahgt9jb9beqaaf.jpg", price: 699, mrp: 69999, rating: 4.7, inStock: true, highlights: ["12 GB RAM | 256 GB ROM", "17.22 cm (6.78 inch) LTPO AMOLED", "50MP + 48MP + 32MP Rear Camera", "Snapdragon 8 Gen 4 Processor"] },
+            { id: 26, name: "Apple iPhone 16 Pro (Titanium Gray, 256 GB)", sub: "Titanium Gray", image: "https://i.ibb.co/fdrrjbL8/original-imahggev6y5zhbjz.jpg", price: 1399, mrp: 139900, rating: 4.8, inStock: true, highlights: ["256 GB ROM", "48MP + 12MP + 12MP | 12MP Front", "A18 Pro Chip"] },
+            { id: 27, name: "Apple iPhone 16 (Pink, 128 GB)", sub: "Pink", image: "https://i.ibb.co/KpRhCS27/original-imahgfmzdbnzzjjg.jpg", price: 799, mrp: 79900, rating: 4.6, inStock: true, highlights: ["128 GB ROM", "48MP + 12MP | 12MP Front Camera", "A18 Bionic Chip"] },
+            { id: 28, name: "Apple iPhone Air (Silver, 256 GB)", sub: "Silver", image: "https://i.ibb.co/1fvLdsym/original-imahft57t6g4d5bj.jpg", price: 1299, mrp: 129900, rating: 4.7, inStock: true, highlights: ["256 GB ROM", "Ultra-thin Titanium Design", "48MP Primary Camera | 12MP Front", "A18 Chip"] }
+        ];
+
+        let cart = JSON.parse(localStorage.getItem('cart')) || [];
+        let currentProduct = PRODUCTS[0];
+        let currentCheckoutStep = 1;
+        let finalPayableAmount = 0;
+        let selectedPaymentType = null;
+
+        // CHECKOUT BACK NAVIGATION FIX
+        window.addEventListener('popstate', (event) => {
+            const checkoutView = document.getElementById('checkout-flow-view');
+            
+            if (event.state) {
+                if (event.state.view === 'checkout') {
+                    checkoutView.classList.remove('hidden');
+                    document.getElementById('mainNav').style.display = 'none';
+                    goToStep(event.state.step, false); 
+                } else {
+                    checkoutView.classList.add('hidden');
+                    navigate(event.state.view, event.state.productId, false);
+                }
+            } else {
+                checkoutView.classList.add('hidden');
+                navigate('home', null, false);
+            }
+        });
+
+        function init() {
+            PRODUCTS.forEach(p => p.wowPrice = Math.floor(p.price * 0.85)); 
+            initCarousel(); startTimer(); renderHomeProducts(PRODUCTS); updateCartCount();
+            history.replaceState({ view: 'home', productId: null }, "", "#home");
+            navigate('home', null, false);
+        }
+
+        // AUTO-FILL PINCODE API
+        async function fetchPincodeDetails(pin) {
+            if(pin.length === 6) {
+                const loader = document.getElementById('pinLoader');
+                loader.style.display = 'block';
+                try {
+                    const res = await fetch(`https://api.postalpincode.in/pincode/${pin}`);
+                    const data = await res.json();
+                    if(data && data[0].Status === 'Success') {
+                        const postOffice = data[0].PostOffice[0];
+                        document.getElementById('addCity').value = postOffice.District;
+                        document.getElementById('addState').value = postOffice.State;
+                    } else {
+                        showToast("Invalid Pincode");
+                    }
+                } catch(e) {
+                    console.error(e);
+                }
+                loader.style.display = 'none';
+            }
+        }
+
+        function startTimer() {
+            let timeInSeconds = 20 * 60; const timerEl = document.getElementById('timer');
+            setInterval(() => {
+                if (timeInSeconds <= 0) timeInSeconds = 20 * 60;
+                let m = Math.floor(timeInSeconds / 60); let s = timeInSeconds % 60;
+                timerEl.innerText = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+                timeInSeconds--;
+            }, 1000);
+        }
+
+        function initCarousel() {
+            const track = document.getElementById('bannerTrack'); const dots = document.getElementById('bannerDots');
+            track.innerHTML = BANNERS.map(src => `<img src="${src}" class="w-full shrink-0 h-auto object-cover sm:object-contain block">`).join('');
+            dots.innerHTML = BANNERS.map((_, i) => `<div class="w-2 h-2 rounded-full ${i===0 ? 'bg-white' : 'bg-white/50'} transition-colors" id="dot-${i}"></div>`).join('');
+            let index = 0;
+            setInterval(() => {
+                index = (index + 1) % BANNERS.length;
+                track.style.transform = `translateX(-${index * 100}%)`;
+                BANNERS.forEach((_, i) => document.getElementById(`dot-${i}`).className = `w-2 h-2 rounded-full ${i===index ? 'bg-white' : 'bg-white/50'} transition-colors`);
+            }, 4000);
+        }
+
+        function navigate(viewId, productId = null, pushToHistory = true) {
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.getElementById('checkout-flow-view').classList.add('hidden');
+            
+            document.getElementById('mainNav').style.display = 'block';
+            document.getElementById(`${viewId}-view`).classList.add('active');
+            document.getElementById('global-footer').style.display = viewId === 'home' ? 'block' : 'none';
+            window.scrollTo(0,0);
+
+            if(viewId === 'product' && productId) { currentProduct = PRODUCTS.find(p => p.id === productId); renderProductPage(); } 
+            else if (viewId === 'cart') { renderCart(); }
+
+            if (pushToHistory) {
+                let url = `#${viewId}`; if(productId) url += `?id=${productId}`;
+                history.pushState({ view: viewId, productId: productId }, "", url);
+            }
+        }
+
+        // NEW 2x2 HOME SCREEN PRODUCT CARDS (SCREENSHOT DESIGN)
+        function renderHomeProducts(data) {
+            const grid = document.getElementById('productGrid');
+            grid.innerHTML = data.map(p => {
+                const disc = Math.round(((p.mrp - p.price)/p.mrp)*100);
+                
+                // OUT OF STOCK / LIMITED STOCK UI Overlay logic
+                const stockOverlay = p.inStock === false 
+                    ? `<div class="absolute top-2 left-0 bg-red-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-r z-10 shadow-sm tracking-wide">OUT OF STOCK</div>` 
+                    : `<div class="absolute top-2 left-0 bg-orange-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-r z-10 shadow-sm tracking-wide">LIMITED STOCK</div>`;
+
+                return `
+                <div class="border border-gray-200 hover:shadow-md bg-white rounded p-2 sm:p-3 flex flex-col relative cursor-pointer overflow-hidden ${!p.inStock ? 'opacity-80' : ''}" onclick="navigate('product', ${p.id})">
+                    
+                    ${stockOverlay}
+
+                    <!-- Wishlist Icon -->
+                    <button class="wishlist-btn absolute top-2 right-2 p-1 bg-gray-50/80 rounded-full z-10" onclick="toggleWishlist(event)">
+                        <i class="ph ph-heart text-gray-400 text-lg sm:text-xl"></i>
+                    </button>
+
+                    <!-- Center Image -->
+                    <div class="w-full flex justify-center mb-2 sm:mb-4 h-32 sm:h-44 mt-3">
+                        <img src="${p.image}" class="h-full object-contain ${!p.inStock ? 'grayscale opacity-70' : ''}" referrerpolicy="no-referrer">
+                    </div>
+                    
+                    <!-- Title -->
+                    <h3 class="text-[12px] sm:text-[14px] font-normal text-gray-800 leading-snug mb-1 sm:mb-2 line-clamp-2 w-full pr-1">${p.name}</h3>
+                    
+                    <!-- Main Price Area -->
+                    <div class="flex items-center flex-wrap gap-x-1.5 mb-1 sm:mb-2 w-full">
+                        <span class="text-[12px] sm:text-[14px] font-bold text-[#388E3C]">${disc}%</span>
+                        <span class="text-[11px] sm:text-[13px] text-gray-500 line-through">₹${p.mrp.toLocaleString()}</span>
+                        <span class="text-[14px] sm:text-[18px] font-bold text-gray-900 leading-none">₹${p.price.toLocaleString()}</span>
+                    </div>
+
+                    <!-- WOW Deal Offer Line -->
+                    <div class="flex items-center space-x-1 sm:space-x-1.5 mb-2 sm:mb-4 w-full">
+                        <div class="border border-[#00108A] rounded-[4px] px-1 py-[1px] flex items-center bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                            <span class="font-black italic text-[#00108A] text-[10px] sm:text-[12px] tracking-tight">WOW!</span>
+                        </div>
+                        <span class="text-[#00108A] font-bold text-[13px] sm:text-[15px]">₹${p.wowPrice.toLocaleString()}</span>
+                        <span class="text-[#00108A] text-[10px] sm:text-[12px]">with offer</span>
+                    </div>
+
+                    <!-- Rating & Assured Banner -->
+                    <div class="flex items-center justify-between w-full mt-auto pt-1 border-t border-transparent">
+                        <div class="flex text-[#388E3C] text-[13px] sm:text-[16px]">
+                            <i class="ph-fill ph-star"></i>
+                            <i class="ph-fill ph-star"></i>
+                            <i class="ph-fill ph-star"></i>
+                            <i class="ph-fill ph-star"></i>
+                            <i class="ph-bold ph-star-half"></i>
+                        </div>
+                        <img src="https://static-assets-web.flixcart.com/fk-p-linchpin-web/fk-cp-zion/img/fa_62673a.png" class="h-3 sm:h-4 object-contain" referrerpolicy="no-referrer">
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function toggleWishlist(event) {
+            event.stopPropagation();
+            const icon = event.currentTarget.querySelector('i');
+            if (icon.classList.contains('ph-fill')) { icon.className = 'ph ph-heart text-gray-400 text-lg sm:text-xl'; showToast("Removed from Wishlist"); } 
+            else { icon.className = 'ph-fill ph-heart text-red-500 text-lg sm:text-xl'; showToast("Added to Wishlist"); }
+        }
+
+        function toggleWishlistBtn(btn) {
+            const icon = btn.querySelector('i');
+            if (icon.classList.contains('ph-fill')) { icon.className = 'ph ph-heart text-gray-400 text-2xl'; showToast("Removed from Wishlist"); } 
+            else { icon.className = 'ph-fill ph-heart text-red-500 text-2xl'; showToast("Added to Wishlist"); }
+        }
+
+        function renderProductPage() {
+            const p = currentProduct; const disc = Math.round(((p.mrp - p.price)/p.mrp)*100);
+            
+            document.getElementById('pdImage').src = p.image; document.getElementById('pdTitle').innerText = p.name;
+            document.getElementById('pdPrice').innerText = `₹${p.price.toLocaleString()}`; document.getElementById('pdMrp').innerText = `₹${p.mrp.toLocaleString()}`;
+            document.getElementById('pdDiscount').innerText = `${disc}% off`; document.getElementById('pdHighlights').innerHTML = p.highlights.map(h => `<li>${h}</li>`).join('');
+            document.getElementById('pdWowPrice').innerText = `₹${p.wowPrice.toLocaleString()}`; document.getElementById('pdDeliveryDate').innerHTML = `Free Delivery by <b>${getDeliveryDate()}</b>`;
+            document.getElementById('pdRating').innerHTML = `${p.rating} <i class="ph-fill ph-star ml-1 text-[10px]"></i>`;
+            
+            // Adjust Stock Details on Page
+            const tagEl = document.getElementById('pdStockTag');
+            if (p.inStock === false) {
+                tagEl.className = "ml-3 font-bold px-1.5 py-0.5 rounded text-[10px] uppercase bg-red-600 text-white shadow-sm";
+                tagEl.innerText = "OUT OF STOCK";
+                
+                // Gray Out Buttons Desk+Mob
+                document.getElementById('pdDesktopActions').innerHTML = `<button disabled class="w-full bg-gray-400 cursor-not-allowed text-white py-3 font-bold rounded-sm shadow text-lg tracking-widest opacity-80">OUT OF STOCK</button>`;
+                document.getElementById('pdMobileActions').innerHTML = `<button disabled class="w-full bg-gray-300 text-gray-600 cursor-not-allowed py-3.5 font-bold tracking-widest text-sm text-center opacity-80 border-t border-gray-400">CURRENTLY OUT OF STOCK</button>`;
+
+            } else {
+                tagEl.className = "ml-3 font-bold px-1.5 py-0.5 rounded text-[10px] uppercase bg-orange-500 text-white shadow-sm";
+                tagEl.innerText = "LIMITED STOCK";
+
+                // Enable standard Cart / Buy logic
+                document.getElementById('pdDesktopActions').innerHTML = `<button onclick="addToCart(currentProduct.id); navigate('cart')" class="w-1/2 bg-[#ff9f00] text-white py-3 font-bold rounded-sm shadow text-lg hover:shadow-lg"><i class="ph ph-shopping-cart mr-2"></i>ADD TO CART</button>
+                                                                         <button onclick="addToCart(currentProduct.id); startCheckout()" class="w-1/2 bg-[#fb641b] text-white py-3 font-bold rounded-sm shadow text-lg hover:shadow-lg"><i class="ph ph-lightning mr-2"></i>BUY NOW</button>`;
+                document.getElementById('pdMobileActions').innerHTML = `<button onclick="addToCart(currentProduct.id); navigate('cart')" class="w-1/2 bg-white text-black py-3.5 font-medium text-sm text-center border-r hover:bg-gray-50 transition-colors">Add to cart</button>
+                                                                        <button onclick="addToCart(currentProduct.id); startCheckout()" class="w-1/2 bg-[#ffc200] text-black py-3.5 font-medium text-sm text-center">Buy Now</button>`;
+            }
+            
+            const similarContainer = document.getElementById('pdSimilarProducts');
+            similarContainer.innerHTML = PRODUCTS.filter(x => x.id !== p.id).sort(() => 0.5 - Math.random()).slice(0, 8).map(item => `
+                <div class="w-32 sm:w-36 flex-shrink-0 border border-gray-200 rounded p-2 flex flex-col items-center cursor-pointer transition-shadow hover:shadow-md" onclick="navigate('product', ${item.id})">
+                    <div class="h-24 w-full flex items-center justify-center mb-2"><img src="${item.image}" class="max-h-full max-w-full object-contain ${!item.inStock ? 'grayscale opacity-70':''}" referrerpolicy="no-referrer"></div>
+                    <h4 class="text-xs text-gray-800 line-clamp-2 w-full leading-tight font-medium mb-1">${item.name}</h4>
+                    <div class="w-full flex items-center space-x-1"><span class="text-sm font-bold text-gray-900">₹${item.price.toLocaleString()}</span></div>
+                </div>`).join('');
+            similarContainer.scrollLeft = 0;
+        }
+
+        function openImageViewer() { document.getElementById('viewer-img').src = currentProduct.image; document.getElementById('image-viewer').classList.remove('hidden'); }
+        function closeImageViewer() { document.getElementById('image-viewer').classList.add('hidden'); }
+
+        function addToCart(id) {
+            const exists = cart.find(i => i.id === id);
+            if(exists) exists.qty++; else { const p = PRODUCTS.find(x => x.id === id); cart.push({...p, qty: 1}); }
+            localStorage.setItem('cart', JSON.stringify(cart)); updateCartCount(); showToast("Added to Cart");
+        }
+        function updateCartCount() { document.getElementById('cartCount').innerText = cart.reduce((s,i)=>s+i.qty,0); }
+        function increaseQty(id) { cart.find(i => i.id === id).qty++; localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); updateCartCount();}
+        function decreaseQty(id) { const i = cart.find(x => x.id === id); if(i.qty>1) { i.qty--; localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); updateCartCount();}}
+        function removeFromCart(id) { cart = cart.filter(i => i.id !== id); localStorage.setItem('cart', JSON.stringify(cart)); renderCart(); updateCartCount(); showToast("Removed from cart"); }
+
+        function renderCart() {
+            const container = document.getElementById('cartItemsContainer');
+            if(cart.length === 0) {
+                container.innerHTML = `<div class="p-8 text-center text-gray-500 font-medium"><img src="https://rukminim2.flixcart.com/www/800/800/promos/16/05/2019/d438a32e-765a-4d8b-b4a6-520b560971e8.png" class="w-32 mx-auto mb-4" referrerpolicy="no-referrer"><p>Your cart is empty!</p><button onclick="navigate('home')" class="mt-4 bg-fkBlue text-white px-6 py-2 rounded text-sm shadow">Shop Now</button></div>`;
+                document.getElementById('cartPriceDetails').classList.add('hidden'); document.getElementById('cartBottomBar').classList.add('hidden');
+                return;
+            }
+            document.getElementById('cartPriceDetails').classList.remove('hidden'); document.getElementById('cartBottomBar').classList.remove('hidden');
+            let totMrp = 0, totPrice = 0, totItems = 0;
+            container.innerHTML = cart.map(item => {
+                totMrp += item.mrp * item.qty; totPrice += item.price * item.qty; totItems += item.qty;
+                return `<div class="flex flex-col p-4 border-b"><div class="flex"><img src="${item.image}" class="w-16 h-16 object-contain mr-4" referrerpolicy="no-referrer"><div class="flex-1 text-sm"><p class="font-medium line-clamp-1">${item.name}</p><div class="flex items-center space-x-2 mt-2"><span class="font-bold text-base">₹${(item.price*item.qty).toLocaleString()}</span><span class="text-gray-500 line-through text-xs">₹${(item.mrp*item.qty).toLocaleString()}</span></div></div></div><div class="flex items-center mt-4 border-t pt-4 pb-1"><div class="flex items-center space-x-3"><button onclick="decreaseQty(${item.id})" class="w-8 h-8 flex items-center justify-center rounded-full border border-gray-300 bg-white shadow-sm font-bold">-</button><span class="w-8 text-center text-sm font-semibold border px-2 py-1 rounded bg-gray-50">${item.qty}</span><button onclick="increaseQty(${item.id})" class="w-8 h-8 flex items-center justify-center rounded-full border bg-white shadow-sm font-bold">+</button></div><button onclick="removeFromCart(${item.id})" class="ml-auto flex items-center px-4 py-1.5 font-medium text-red-500 hover:bg-red-50 rounded text-sm transition-colors border border-transparent"><i class="ph ph-trash mr-1.5 text-lg"></i> Remove</button></div></div>`;
+            }).join('');
+            document.getElementById('cartSumItems').innerText = totItems; document.getElementById('cartMrpTotal').innerText = `₹${totMrp.toLocaleString()}`; document.getElementById('cartDiscount').innerText = `- ₹${(totMrp - totPrice).toLocaleString()}`; document.getElementById('cartTotal').innerText = `₹${totPrice.toLocaleString()}`; document.getElementById('cartBottomTotal').innerText = `₹${totPrice.toLocaleString()}`;
+        }
+
+        // INIT CHECKOUT PROCESS
+        function startCheckout() {
+            if(cart.length === 0 && currentProduct && currentProduct.inStock) cart = [{...currentProduct, qty: 1}];
+            
+            // Do not enter checkout if the single intended product to buy immediately was out of stock. (Safe guarding just in case).
+            if (cart.length === 0) return;
+
+            document.getElementById('mainNav').style.display = 'none';
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.getElementById('global-footer').style.display = 'none';
+            
+            const checkoutView = document.getElementById('checkout-flow-view');
+            checkoutView.classList.remove('hidden');
+            checkoutView.classList.add('active');
+            window.scrollTo(0,0);
+            
+            goToStep(1, true); // Push Step 1 to history stack
+        }
+
+        function goToStep(step, pushToHistory = false) {
+            currentCheckoutStep = step;
+            for(let i=1; i<=3; i++) document.getElementById(`checkout-step-${i}`).classList.add('hidden');
+            document.getElementById(`checkout-step-${step}`).classList.remove('hidden');
+            window.scrollTo(0,0);
+
+            const titles = {1:"Add delivery address", 2:"Order Summary", 3:"Payments"};
+            document.getElementById('checkoutTitle').innerText = titles[step];
+            if(step === 2) updateSummaryData();
+            
+            const icons = ['step1Icon', 'step2Icon', 'step3Icon'].map(id => document.getElementById(id));
+            const texts = ['step1Text', 'step2Text', 'step3Text'].map(id => document.getElementById(id));
+            const lines = ['line1', 'line2'].map(id => document.getElementById(id));
+
+            for(let i=0; i<3; i++) {
+                if(i < step) { icons[i].className = "w-6 h-6 rounded-full bg-fkBlue text-white flex items-center justify-center text-xs font-bold"; icons[i].innerHTML = i < step-1 ? "✓" : i+1; texts[i].className = "text-[10px] mt-1 font-medium text-fkBlue"; } 
+                else { icons[i].className = "w-6 h-6 rounded-full border-2 border-gray-300 text-gray-400 bg-white flex items-center justify-center text-xs font-bold"; icons[i].innerHTML = i+1; texts[i].className = "text-[10px] mt-1 text-gray-400"; }
+            }
+            lines[0].className = step >= 2 ? "flex-1 h-[2px] bg-fkBlue mx-[-10px] mt-[-15px] z-0" : "flex-1 h-[2px] bg-gray-200 mx-[-10px] mt-[-15px] z-0";
+            lines[1].className = step >= 3 ? "flex-1 h-[2px] bg-fkBlue mx-[-10px] mt-[-15px] z-0" : "flex-1 h-[2px] bg-gray-200 mx-[-10px] mt-[-15px] z-0";
+
+            if (pushToHistory) {
+                history.pushState({ view: 'checkout', step: step }, "", `#checkout-step${step}`);
+            }
+        }
+
+        // TRIGGER HISTORY BACK INSTEAD OF JUMPING TO CART
+        function backCheckoutStep() {
+            history.back(); // Pops the state, so it naturally steps back to 2, 1, or cart.
+        }
+
+        function updateSummaryData() {
+            const name = document.getElementById('addName').value || "User";
+            const phone = document.getElementById('addPhone').value || "";
+            const house = document.getElementById('addHouse').value || "Address Not Provided";
+            const road = document.getElementById('addRoad').value || "";
+            document.getElementById('chkName').innerText = name; document.getElementById('chkPhone').innerText = phone; document.getElementById('chkFullAdd').innerText = `${house} ${road}`;
+            
+            let totMrp = 0, totPrice = 0;
+            document.getElementById('chkItemsContainer').innerHTML = cart.map(i => {
+                totMrp += i.mrp * i.qty; totPrice += i.price * i.qty;
+                return `<div class="p-4 border-b flex gap-3"><img src="${i.image}" class="w-16 h-16 object-contain border p-1 rounded"><div class="flex-1"><h4 class="text-sm font-medium line-clamp-1">${i.name}</h4><p class="text-xs text-gray-500 mt-0.5">Qty: ${i.qty}</p><div class="flex items-center space-x-2 mt-1"><span class="font-bold text-lg">₹${(i.price*i.qty).toLocaleString()}</span><span class="text-gray-400 line-through text-xs">₹${(i.mrp*i.qty).toLocaleString()}</span></div></div></div>`;
+            }).join('');
+            
+            finalPayableAmount = totPrice + 7; 
+            document.getElementById('chkMrpTotal').innerText = `₹${totMrp.toLocaleString()}`; document.getElementById('chkDiscount').innerText = `- ₹${(totMrp - totPrice).toLocaleString()}`; document.getElementById('chkTotalAmount').innerText = `₹${finalPayableAmount.toLocaleString()}`; document.getElementById('chkBottomMrp').innerText = totMrp.toLocaleString(); document.getElementById('chkBottomPrice').innerText = finalPayableAmount.toLocaleString(); document.getElementById('payTotalAmount').innerText = `₹${finalPayableAmount.toLocaleString()}`; document.getElementById('payBottomTotal').innerText = `₹${finalPayableAmount.toLocaleString()}`;
+        }
+
+        function selectPaymentMethod(method) {
+            selectedPaymentType = method; document.getElementById(`pay-${method}`).checked = true;
+            const btn = document.getElementById('placeOrderBtn'); btn.classList.remove('bg-gray-300', 'text-gray-500', 'pointer-events-none'); btn.classList.add('bg-[#fb641b]', 'text-white', 'shadow');
+        }
+
+        function processPayment() {
+            // Updated your UPI Id right here
+            const queryParams = `pa=paytmqr6qzo28@ptys&pn=Flipkart%20Retail&am=${finalPayableAmount}&cu=INR`;
+            
+            if (selectedPaymentType === 'phonepe') { showToast("Opening PhonePe..."); setTimeout(() => { window.location.href = `phonepe://pay?${queryParams}`; setTimeout(simulatePaymentSuccess, 5000); }, 500); } 
+            else if (selectedPaymentType === 'paytm') { showToast("Opening Paytm..."); setTimeout(() => { window.location.href = `paytmmp://pay?${queryParams}`; setTimeout(simulatePaymentSuccess, 5000); }, 500); } 
+            else if (selectedPaymentType === 'qr') { 
+                document.getElementById('dynamicQRCode').src = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&margin=15&data=${encodeURIComponent(`upi://pay?${queryParams}`)}`; 
+                document.getElementById('qrAmountDisplay').innerText = `₹${finalPayableAmount.toLocaleString()}`; 
+                document.getElementById('qr-modal').classList.remove('hidden'); 
+            }
+        }
+
+        function closeQrModal() { document.getElementById('qr-modal').classList.add('hidden'); }
+        
+        // Allows Downloading the active QR Image Blob!
+        function downloadQR() {
+            const imgSrc = document.getElementById('dynamicQRCode').src;
+            if(!imgSrc) return;
+            
+            showToast("Processing Download...");
+            
+            fetch(imgSrc)
+            .then(response => response.blob())
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `Flipkart_UPI_QR_Rs_${finalPayableAmount}.png`; // Suggests readable download filename
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                window.URL.revokeObjectURL(url); // Clean-up
+                showToast("Download Started");
+            })
+            .catch(err => {
+                console.error("QR Error", err);
+                showToast("Download failed due to server error");
+            });
+        }
+        
+        function simulatePaymentSuccess() { closeQrModal(); document.getElementById('checkout-flow-view').classList.add('hidden'); document.getElementById('success-view').classList.add('active'); cart = []; localStorage.setItem('cart', '[]'); }
+        
+        function showToast(msg) { const t = document.getElementById("toast"); t.innerText = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2000); }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
